@@ -19,7 +19,8 @@ from torch_sparse import SparseTensor
 import multiprocessing as mp
 from collections import Counter
 
-# mp.set_start_method('fork')
+# decomment for macos
+mp.set_start_method('fork')
 
 seed = 0
 

@@ -89,8 +89,6 @@ class KGTORE(RecMixin, BaseRecommenderModel):
             edges_lr=self._elr,
             embedding_size=self._factors,
             l_w=self._l_w,
-            alpha=self._alpha,
-            beta=self._beta,
             l_ind=self._l_ind,
             ind_edges=self._ind_edges,
             n_layers=self._n_layers,

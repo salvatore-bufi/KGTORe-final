@@ -17,8 +17,6 @@ class KGTOREModel(torch.nn.Module, ABC):
                  edges_lr,
                  embedding_size,
                  l_w,
-                 alpha,
-                 beta,
                  l_ind,
                  ind_edges,
                  n_layers,
@@ -67,9 +65,17 @@ class KGTOREModel(torch.nn.Module, ABC):
         self.edge_attr_weight = deg_inv[row]
         self.edge_attr_weight[num_interactions:] = 1.
 
+        self.user_inter = self.edge_index[0, 0:int(self.edge_index.size(1) / 2)]
+        self.item_inter = self.edge_index[0, int(self.edge_index.size(1) / 2):]
+
         # ADDITIVE OPTIONS
-        self.a = alpha
-        self.b = beta
+        self.a = torch.nn.Parameter(
+            torch.abs(torch.nn.init.xavier_normal_(torch.empty((int(self.edge_index.size(1)/2), 1)))).to(self.device),
+            requires_grad=True)
+        self.b = torch.nn.Parameter(
+            torch.abs(torch.nn.init.xavier_normal_(torch.empty((int(self.edge_index.size(1)/2), 1)))).to(self.device),
+            requires_grad=True)
+
 
         self.Gu = torch.nn.Parameter(
             torch.nn.init.xavier_normal_(torch.empty((self.num_users, self.embedding_size))).to(self.device),
@@ -86,7 +92,7 @@ class KGTOREModel(torch.nn.Module, ABC):
 
         propagation_network_list = []
         for layer in range(self.n_layers):
-            propagation_network_list.append((LGConv(alpha=self.a, beta=self.b), 'x, edge_index -> x'))
+            propagation_network_list.append((LGConv(), 'x, edge_index -> x'))
         self.propagation_network = torch_geometric.nn.Sequential('x, edge_index', propagation_network_list).to(self.device)
 
         self.softplus = torch.nn.Softplus()
@@ -107,8 +113,18 @@ class KGTOREModel(torch.nn.Module, ABC):
 
     def propagate_embeddings(self, evaluate=False):
 
-        edge_embeddings_u_i = matmul(self.edge_features, self.F) * (1 - self.b)
-        edge_embeddings_i_u = matmul(self.item_features, self.F)[self.items] * (1-self.a)
+        a = self.a[self.item_inter]
+        b = self.b[self.user_inter]
+        b_minus = 1 - a
+        a_minus = 1 - b
+
+
+        edge_embeddings_u_i_0 = matmul(self.edge_features, self.F)
+        edge_embeddings_u_i = edge_embeddings_u_i_0 * b
+
+        edge_embeddings_i_u_0 = matmul(self.item_features, self.F)[self.items]
+        edge_embeddings_i_u = edge_embeddings_i_u_0 * a
+
 
         ego_embeddings = torch.cat((self.Gu, self.Gi), 0).to(self.device)
         all_embeddings = [ego_embeddings]
@@ -120,12 +136,12 @@ class KGTOREModel(torch.nn.Module, ABC):
                 with torch.no_grad():
                     all_embeddings += [list(
                         self.propagation_network.children())[layer](
-                        all_embeddings[layer], self.edge_index, edge_embeddings, self.edge_attr_weight)
+                        all_embeddings[layer], self.edge_index, edge_embeddings, self.edge_attr_weight, a_minus, b_minus)
                     ]
             else:
                 all_embeddings += [list(
                     self.propagation_network.children())[layer](
-                    all_embeddings[layer], self.edge_index, edge_embeddings, self.edge_attr_weight)
+                    all_embeddings[layer], self.edge_index, edge_embeddings, self.edge_attr_weight, a, b)
                 ]
 
         if evaluate:

@@ -30,18 +30,16 @@ class LGConv(MessagePassing):
           edge weights :math:`(|\mathcal{E}|)` *(optional)*
         - **output:** node features :math:`(|\mathcal{V}|, F)`
     """
-    def __init__(self, alpha, beta, normalize: bool = True, **kwargs):
+    def __init__(self, normalize: bool = True, **kwargs):
         kwargs.setdefault('aggr', 'add')
         super().__init__(**kwargs)
-        self.alpha = alpha
-        self.beta = beta
         self.normalize = normalize
 
     def reset_parameters(self):
         pass
 
     def forward(self, x: Tensor, edge_index: Adj,
-                edge_attr: OptTensor = None, edge_attr_weight: OptTensor = None) -> Tensor:
+                edge_attr: OptTensor = None, edge_attr_weight: OptTensor = None, alpha =None, beta=None) -> Tensor:
 
         if self.normalize and isinstance(edge_index, Tensor):
             out = gcn_norm(edge_index, None, x.size(self.node_dim),
@@ -54,11 +52,11 @@ class LGConv(MessagePassing):
 
         # propagate_type: (x: Tensor, edge_weight: OptTensor)
         return self.propagate(edge_index, x=x, edge_weight=edge_weight, edge_attr=edge_attr, edge_attr_weight=edge_attr_weight,
-                              size=None)
+                              size=None, alpha =alpha, beta =beta)
 
-    def message(self, x_j: Tensor, edge_weight, edge_attr: OptTensor, edge_attr_weight: OptTensor) -> Tensor:
-        num_trans = x_j.shape[0] // 2
-        x_j[:num_trans] = x_j[:num_trans] * self.beta
-        x_j[num_trans:] = x_j[num_trans:] * self.alpha
-        return (edge_attr_weight.reshape(-1, 1) * edge_attr) + torch.mul(x_j, edge_weight.reshape(-1, 1))
+    def message(self, x_j: Tensor, edge_weight, edge_attr: OptTensor, edge_attr_weight: OptTensor, size, alpha, beta) -> Tensor:
+        # num_trans = x_j.shape[0] // 2
+        beta_alpha = torch.cat((beta, alpha), 0)
+        x = x_j * beta_alpha
+        return (edge_attr_weight.reshape(-1, 1) * edge_attr) + torch.mul(x, edge_weight.reshape(-1, 1))
 

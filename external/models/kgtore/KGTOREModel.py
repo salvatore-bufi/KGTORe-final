@@ -99,7 +99,7 @@ class KGTOREModel(torch.nn.Module, ABC):
 
         self.softplus = torch.nn.Softplus()
 
-        self.optimizer = torch.optim.Adam([self.Gu, self.Gi], lr=self.learning_rate)
+        self.optimizer = torch.optim.Adam([self.Gu, self.Gi, self.a, self.b], lr=self.learning_rate)
         self.edges_optimizer = torch.optim.Adam([self.F], lr=self.edges_lr)
 
         self.ind_edges = ind_edges
@@ -173,7 +173,9 @@ class KGTOREModel(torch.nn.Module, ABC):
         difference = torch.clamp(xu_pos - xu_neg, -80.0, 1e8)
         bpr_loss = torch.sum(self.softplus(-difference))
         reg_loss = self.l_w * (torch.norm(self.Gu, 2) +
-                               torch.norm(self.Gi, 2))
+                               torch.norm(self.Gi, 2) +
+                               torch.norm(self.a, 2) +
+                               torch.norm(self.b, 2))
         features_reg_loss = self.l_w * torch.norm(self.F, 2)
 
         # independence loss over the features within the same path

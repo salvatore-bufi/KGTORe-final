@@ -66,16 +66,18 @@ class KGTOREModel(torch.nn.Module, ABC):
         self.edge_attr_weight[num_interactions:] = 1.
 
         self.user_inter = self.edge_index[0, 0:int(self.edge_index.size(1) / 2)]
-        self.item_inter = self.edge_index[0, int(self.edge_index.size(1) / 2):]
+        self.item_inter = self.edge_index[0, int(self.edge_index.size(1) / 2):] - self.num_users
 
         # ADDITIVE OPTIONS
-        self.a = torch.nn.Parameter(
-            torch.abs(torch.nn.init.xavier_normal_(torch.empty((int(self.edge_index.size(1)/2), 1)))).to(self.device),
-            requires_grad=True)
+        # self.a = torch.nn.Parameter(
+        #     torch.abs(torch.nn.init.xavier_normal_(torch.empty((int(self.edge_index.size(1)/2), 1)))).to(self.device),
+        #     requires_grad=True)
+        # self.b = torch.nn.Parameter(
+        #     torch.abs(torch.nn.init.xavier_normal_(torch.empty((int(self.edge_index.size(1)/2), 1)))).to(self.device),
+        #     requires_grad=True)
+        self.a = torch.nn.Parameter(torch.abs(torch.nn.init.xavier_normal_(torch.empty(self.num_items, 1))).to(self.device), requires_grad=True)
         self.b = torch.nn.Parameter(
-            torch.abs(torch.nn.init.xavier_normal_(torch.empty((int(self.edge_index.size(1)/2), 1)))).to(self.device),
-            requires_grad=True)
-
+            torch.abs(torch.nn.init.xavier_normal_(torch.empty(self.num_users, 1))).to(self.device), requires_grad=True)
 
         self.Gu = torch.nn.Parameter(
             torch.nn.init.xavier_normal_(torch.empty((self.num_users, self.embedding_size))).to(self.device),

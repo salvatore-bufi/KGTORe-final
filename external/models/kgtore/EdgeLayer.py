@@ -55,6 +55,7 @@ class LGConv(MessagePassing):
                               size=None, alpha =alpha, beta =beta)
 
     def message(self, x_j: Tensor, edge_weight, edge_attr: OptTensor, edge_attr_weight: OptTensor, size, alpha, beta) -> Tensor:
+        #
         # num_trans = x_j.shape[0] // 2
         beta_alpha = torch.cat((beta, alpha), 0)
         x = x_j * beta_alpha

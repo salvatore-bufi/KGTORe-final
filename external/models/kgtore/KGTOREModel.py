@@ -172,10 +172,12 @@ class KGTOREModel(torch.nn.Module, ABC):
         xu_neg = self.forward(inputs=(gu[user[:, 0]], gi[neg[:, 0]]))
         difference = torch.clamp(xu_pos - xu_neg, -80.0, 1e8)
         bpr_loss = torch.sum(self.softplus(-difference))
-        reg_loss = self.l_w * (1/2) * (torch.norm(self.Gu, 2) +
-                               torch.norm(self.Gi, 2) +
-                               torch.norm(self.a, 2) +
-                               torch.norm(self.b, 2)) / float(batch[0].shape[0])
+        reg_loss = self.l_w * (1/2) * (self.Gu[user[:,0]].norm(2).pow(2) +
+                                       self.Gi[pos[:,0]].norm(2).pow(2)+
+                                       self.Gi[neg[:,0]].norm(2).pow(2) +
+                                       self.a.norm(2).pow(2) +
+                                       self.b.norm(2).pow(2)) / float(batch[0].shape[0])
+
         features_reg_loss = self.l_w * torch.norm(self.F, 2)
 
         # independence loss over the features within the same path

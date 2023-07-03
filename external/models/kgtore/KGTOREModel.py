@@ -143,7 +143,7 @@ class KGTOREModel(torch.nn.Module, ABC):
             else:
                 all_embeddings += [list(
                     self.propagation_network.children())[layer](
-                    all_embeddings[layer], self.edge_index, edge_embeddings, self.edge_attr_weight, a, b)
+                    all_embeddings[layer], self.edge_index, edge_embeddings, self.edge_attr_weight, a_minus, b_minus)
                 ]
 
         if evaluate:
@@ -172,10 +172,10 @@ class KGTOREModel(torch.nn.Module, ABC):
         xu_neg = self.forward(inputs=(gu[user[:, 0]], gi[neg[:, 0]]))
         difference = torch.clamp(xu_pos - xu_neg, -80.0, 1e8)
         bpr_loss = torch.sum(self.softplus(-difference))
-        reg_loss = self.l_w * (torch.norm(self.Gu, 2) +
+        reg_loss = self.l_w * (1/2) * (torch.norm(self.Gu, 2) +
                                torch.norm(self.Gi, 2) +
                                torch.norm(self.a, 2) +
-                               torch.norm(self.b, 2))
+                               torch.norm(self.b, 2)) / float(batch[0].shape[0])
         features_reg_loss = self.l_w * torch.norm(self.F, 2)
 
         # independence loss over the features within the same path

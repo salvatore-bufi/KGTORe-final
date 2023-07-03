@@ -117,8 +117,8 @@ class KGTOREModel(torch.nn.Module, ABC):
 
     def propagate_embeddings(self, evaluate=False):
 
-        a = self.a[self.item_inter]
-        b = self.b[self.user_inter]
+        a = torch.sigmoid(self.a[self.item_inter])
+        b = torch.sigmoid(self.b[self.user_inter])
         b_minus = 1 - a
         a_minus = 1 - b
 

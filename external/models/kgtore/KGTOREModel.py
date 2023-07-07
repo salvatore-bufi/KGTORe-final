@@ -38,6 +38,7 @@ class KGTOREModel(torch.nn.Module, ABC):
         torch.cuda.manual_seed(random_seed)
         torch.cuda.manual_seed_all(random_seed)
         torch.backends.cudnn.deterministic = True
+        torch.use_deterministic_algorithms(True)
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -188,7 +189,7 @@ class KGTOREModel(torch.nn.Module, ABC):
         self.optimizer.zero_grad()
         self.edges_optimizer.zero_grad()
 
-        loss.backward(retain_graph=True)
+        loss.backward()
         if self.l_ind > 0:
             ind_loss.backward(retain_graph=True)
         features_reg_loss.backward()

@@ -66,10 +66,8 @@ class KGTOREModel(torch.nn.Module, ABC):
         self.edge_attr_weight = deg_inv[row]
         self.edge_attr_weight[num_interactions:] = 1.
 
-        # self.user_inter = self.edge_index[0, 0:int(self.edge_index.size(1) / 2)]
-        # self.item_inter = self.edge_index[0, int(self.edge_index.size(1) / 2):] - self.num_users
-        self.user_inter = self.edge_index[0, 0:self.num_interactions]
-        self.item_inter = self.edge_index[0, self.num_interactions:] - self.num_users
+        self.user_inter = self.edge_index[0, 0:int(self.edge_index.size(1) / 2)]
+        self.item_inter = self.edge_index[0, int(self.edge_index.size(1) / 2):] - self.num_users
 
         # ADDITIVE OPTIONS
         # self.a = torch.nn.Parameter(
@@ -83,35 +81,18 @@ class KGTOREModel(torch.nn.Module, ABC):
         self.b = torch.nn.Parameter(
             torch.abs(torch.nn.init.xavier_normal_(torch.empty(self.num_users, 1))).to(self.device), requires_grad=True)
 
-        # OLD
-        # self.Gu = torch.nn.Parameter(
-        #     torch.nn.init.xavier_normal_(torch.empty((self.num_users, self.embedding_size))).to(self.device),
-        #     requires_grad=True)
-        #
-        # self.Gi = torch.nn.Parameter(
-        #     torch.nn.init.xavier_normal_(torch.empty((self.num_items, self.embedding_size))).to(self.device),
-        #     requires_grad=True)
-
-        # prove
         self.Gu = torch.nn.Parameter(
-            torch.nn.init.xavier_normal_(torch.empty((self.num_users, int(self.embedding_size / 2)))).to(self.device),
+            torch.nn.init.xavier_normal_(torch.empty((self.num_users, self.embedding_size))).to(self.device),
             requires_grad=True)
 
         self.Gi = torch.nn.Parameter(
-            torch.nn.init.xavier_normal_(torch.empty((self.num_items, int(self.embedding_size / 2)))).to(self.device),
-            requires_grad=True)
-
-        self.Gup = torch.nn.Parameter(
-            torch.nn.init.xavier_normal_(torch.empty((self.num_users, int(self.embedding_size / 2)))).to(self.device),
-            requires_grad=True)
-        self.Gip = torch.nn.Parameter(
-            torch.nn.init.xavier_normal_(torch.empty((self.num_items, int(self.embedding_size / 2)))).to(self.device),
+            torch.nn.init.xavier_normal_(torch.empty((self.num_items, self.embedding_size))).to(self.device),
             requires_grad=True)
 
         # features matrix (for edges)
         self.feature_dim = edge_features.size(1)
         self.F = torch.nn.Parameter(
-            torch.nn.init.xavier_normal_(torch.empty((self.feature_dim, int(self.embedding_size / 2)))).to(self.device))
+            torch.nn.init.xavier_normal_(torch.empty((self.feature_dim, self.embedding_size))).to(self.device))
 
         propagation_network_list = []
         for layer in range(self.n_layers):
@@ -121,7 +102,7 @@ class KGTOREModel(torch.nn.Module, ABC):
 
         self.softplus = torch.nn.Softplus()
 
-        self.optimizer = torch.optim.Adam([self.Gu, self.Gi, self.a, self.b, self.Gip, self.Gup], lr=self.learning_rate)
+        self.optimizer = torch.optim.Adam([self.Gu, self.Gi, self.a, self.b], lr=self.learning_rate)
         self.edges_optimizer = torch.optim.Adam([self.F], lr=self.edges_lr)
 
         self.ind_edges = ind_edges
@@ -173,8 +154,6 @@ class KGTOREModel(torch.nn.Module, ABC):
 
         all_embeddings = sum([all_embeddings[k] * self.alpha[k] for k in range(len(all_embeddings))])
         gu, gi = torch.split(all_embeddings, [self.num_users, self.num_items], 0)
-        gu = torch.cat((gu, self.Gup), 1)
-        gi = torch.cat((gi, self.Gip), 1)
 
         return gu.to(self.device), gi.to(self.device)
 
@@ -203,10 +182,7 @@ class KGTOREModel(torch.nn.Module, ABC):
         #                                  self.b.norm(2).pow(2)) / float(batch[0].shape[0])
         reg_loss = self.l_w * (self.Gu[user[:, 0]].norm(2) +
                                self.Gi[pos[:, 0]].norm(2) +
-                               self.Gi[neg[:, 0]].norm(2) +
-                               self.Gup[user[:, 0]].norm(2) +
-                               self.Gip[pos[:, 0]].norm(2) +
-                               self.Gip[neg[:, 0]].norm(2))
+                               self.Gi[neg[:, 0]].norm(2))
 
         features_reg_loss = self.l_w * torch.norm(self.F, 2)
 
@@ -222,7 +198,7 @@ class KGTOREModel(torch.nn.Module, ABC):
         self.edges_optimizer.zero_grad()
 
         loss.backward()
-        # loss.backward(retain_graph=True)
+        loss.backward(retain_graph=True)
         if self.l_ind > 0:
             ind_loss.backward(retain_graph=True)
         features_reg_loss.backward()

@@ -79,8 +79,25 @@ class KGTOREModel(torch.nn.Module, ABC):
             torch.nn.init.xavier_normal_(torch.empty((self.num_items, self.embedding_size))).to(self.device),
             requires_grad=True)
 
+        # self.Gu = torch.nn.Parameter(
+        #     torch.nn.init.xavier_normal_(torch.empty((self.num_users, int(self.embedding_size/2)))).to(self.device),
+        #     requires_grad=True)
+        #
+        # self.Gi = torch.nn.Parameter(
+        #     torch.nn.init.xavier_normal_(torch.empty((self.num_items, int(self.embedding_size/2)))).to(self.device),
+        #     requires_grad=True)
+        #
+        # self.Gup = torch.nn.Parameter(
+        #     torch.nn.init.xavier_normal_(torch.empty((self.num_users, int(self.embedding_size/2)))).to(self.device),
+        #     requires_grad=True)
+        # self.Gip = torch.nn.Parameter(
+        #     torch.nn.init.xavier_normal_(torch.empty((self.num_items, int(self.embedding_size/2)))).to(self.device),
+        #     requires_grad=True)
+
         # features matrix (for edges)
         self.feature_dim = edge_features.size(1)
+        # self.F = torch.nn.Parameter(
+        #     torch.nn.init.xavier_normal_(torch.empty((self.feature_dim, int(self.embedding_size/2)))).to(self.device))
         self.F = torch.nn.Parameter(
             torch.nn.init.xavier_normal_(torch.empty((self.feature_dim, self.embedding_size))).to(self.device))
 
@@ -91,6 +108,7 @@ class KGTOREModel(torch.nn.Module, ABC):
 
         self.softplus = torch.nn.Softplus()
 
+        # self.optimizer = torch.optim.Adam([self.Gu, self.Gi, self.Gip, self.Gup], lr=self.learning_rate)
         self.optimizer = torch.optim.Adam([self.Gu, self.Gi], lr=self.learning_rate)
         self.edges_optimizer = torch.optim.Adam([self.F], lr=self.edges_lr)
 
@@ -133,6 +151,8 @@ class KGTOREModel(torch.nn.Module, ABC):
 
         all_embeddings = sum([all_embeddings[k] * self.alpha[k] for k in range(len(all_embeddings))])
         gu, gi = torch.split(all_embeddings, [self.num_users, self.num_items], 0)
+        # gu = torch.cat((gu, self.Gup), dim=1)
+        # gi = torch.cat((gi, self.Gip), dim=1)
 
         return gu.to(self.device), gi.to(self.device)
 

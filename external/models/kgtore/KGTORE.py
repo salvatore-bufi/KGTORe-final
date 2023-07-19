@@ -10,8 +10,8 @@ from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
 from .KGTOREModel import KGTOREModel
-from .DecisionPaths import DecisionPaths
-from .LoadEdgeFeatures import LoadEdgeFeatures
+from torch_sparse import SparseTensor
+
 
 
 class KGTORE(RecMixin, BaseRecommenderModel):
@@ -26,74 +26,41 @@ class KGTORE(RecMixin, BaseRecommenderModel):
 
         self._params_list = [
             ("_lr", "lr", "lr", 0.0005, float, None),
+            ("_kg", "kg", "kg", 64, int, None),
             ("_elr", "elr", "elr", 0.0005, float, None),
             ("_factors", "factors", "factors", 64, int, None),
             ("_l_w", "l_w", "l_w", 0.01, float, None),
-            ("_alpha", "alpha", "alpha", 0.5, float, None),
-            ("_beta", "beta", "beta", 0.5, float, None),
             ("_l_ind", "l_ind", "l_ind", 0.5, float, None),
             ("_ind_edges", "ind_edges", "ind_edges", 0.01, float, None),
             ("_n_layers", "n_layers", "n_layers", 1, int, None),
-            ("_npr", "npr", "npr", 10, int, None),
-            ("_criterion", "criterion", "criterion", "entropy", str, None),
-            ("_loader", "loader", "loader", "KGTORETSVLoader", None, None)
         ]
 
         self.autoset_params()
-        self._side = getattr(self._data.side_information, self._loader, None)
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
         row, col = data.sp_i_train.nonzero()
-
-        try:
-            name = 'decision_path' + str(self._npr) + "_" + str(self._criterion) + ".tsv"
-            item_features_name = 'item_features' + str(self._npr) + "_" + str(self._criterion) + ".pk"
-            dataset_path = os.path.abspath(os.path.join('./data', config.dataset, 'kgtore', name))
-            item_features_path = os.path.abspath(os.path.join('./data', config.dataset, 'kgtore', item_features_name))
-            print(f'Looking for {dataset_path}')
-            print(f'Looking for {item_features_path}')
-            self.edge_features, self.item_features = LoadEdgeFeatures(dataset_path, item_features_path, self._data.transactions)
-            print("loaded edge features from: ", dataset_path, '\n')
-        except:
-            u_values, u_indices = np.unique(row, return_index=True)
-            u_indices = np.append(u_indices, len(col))
-            u_i_ordered_dict = {u_values[i]: col[u_indices[i]:u_indices[i + 1]] for i in range(len(u_values))}
-            Dec_Paths_class = DecisionPaths(interactions=data.i_train_dict,
-                                            u_i_dict=u_i_ordered_dict,
-                                            kg=self._side.feature_map,
-                                            public_items=data.public_items,
-                                            public_users=data.public_users,
-                                            transaction=self._data.transactions,
-                                            device=device,
-                                            df_name=config.dataset,
-                                            criterion=self._criterion,
-                                            npr=self._npr
-                                            )
-            self.edge_features = Dec_Paths_class.edge_features
-            self.item_features = Dec_Paths_class.item_features
-
         col = [c + self._num_users for c in col]
-        self.edge_index = np.array([list(row) + col, col + list(row)])
-        self.num_interactions = row.shape[0]
-
-        print(f'Number of KGTORE features: {self.edge_features.size(1)}')
+        edge_index = np.array([row, col])
+        edge_index = torch.tensor(edge_index, dtype=torch.int64)
+        self.adj = SparseTensor(row=torch.cat([edge_index[0], edge_index[1]], dim=0),
+                                col=torch.cat([edge_index[1], edge_index[0]], dim=0),
+                                sparse_sizes=(self._num_users + self._num_items,
+                                              self._num_users + self._num_items))
 
 
 
         self._model = KGTOREModel(
             num_users=self._num_users,
             num_items=self._num_items,
-            num_interactions=self.num_interactions,
             learning_rate=self._lr,
             edges_lr=self._elr,
             embedding_size=self._factors,
+            kg_size = self._kg,
             l_w=self._l_w,
             l_ind=self._l_ind,
             ind_edges=self._ind_edges,
             n_layers=self._n_layers,
-            edge_index=self.edge_index,
-            edge_features=self.edge_features,
-            item_features=self.item_features,
+            edge_index=self.adj,
             random_seed=self._seed
         )
 

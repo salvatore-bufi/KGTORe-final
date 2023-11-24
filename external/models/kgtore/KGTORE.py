@@ -45,6 +45,7 @@ class KGTORE(RecMixin, BaseRecommenderModel):
 
         row, col = data.sp_i_train.nonzero()
 
+        print("PROVA")
         try:
             name = 'decision_path' + str(self._npr) + "_" + str(self._criterion) + ".tsv"
             item_features_name = 'item_features' + str(self._npr) + "_" + str(self._criterion) + ".pk"
